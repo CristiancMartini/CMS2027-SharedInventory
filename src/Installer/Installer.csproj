@@ -1,0 +1,27 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>WinExe</OutputType>
+    <TargetFramework>net48</TargetFramework>
+    <UseWindowsForms>true</UseWindowsForms>
+    <LangVersion>latest</LangVersion>
+    <AssemblyName>CMS2027-SharedInventory-Installer</AssemblyName>
+    <RootNamespace>Installer</RootNamespace>
+    <ApplicationManifest>app.manifest</ApplicationManifest>
+    <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
+    <Version>0.1.0</Version>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.NETFramework.ReferenceAssemblies" Version="1.0.3" PrivateAssets="all" />
+    <Reference Include="System.IO.Compression" />
+    <Reference Include="System.IO.Compression.FileSystem" />
+  </ItemGroup>
+
+  <!-- Payload produced by build.ps1: BepInEx zip + the plugin dll. -->
+  <ItemGroup>
+    <EmbeddedResource Include="..\..\payload\BepInEx.zip" LogicalName="BepInEx.zip" />
+    <EmbeddedResource Include="..\..\payload\SharedInventory.dll" LogicalName="SharedInventory.dll" />
+  </ItemGroup>
+
+</Project>

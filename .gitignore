@@ -1,0 +1,7 @@
+bin/
+obj/
+build/
+dist/
+payload/
+*.user
+.vs/
