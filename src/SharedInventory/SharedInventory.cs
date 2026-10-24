@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using CMS.Items;
 using CMS.Multiplayer.Containers;
 using CMS.Multiplayer.Gameplay.Player.Inventory;
@@ -82,6 +83,12 @@ internal static class SharedInventory
         return IsHost && client.HasInputAuthority;
     }
 
+    /// <summary>Player ids (save keys) whose own inventory was already merged into the master.</summary>
+    private static readonly HashSet<string> merged = new();
+
+    /// <summary>Last broadcast state of the master, to notice the host's own changes.</summary>
+    private static long lastSignature;
+
     /// <summary>Host: a client sent an inventory change packet (already applied to its shadow list).</summary>
     internal static void OnInventoryPacket(PlayerRef sender)
     {
@@ -100,12 +107,15 @@ internal static class SharedInventory
         if (data == null || data.Inventory == null || master == null)
             return;
 
+        if (MergeIfNew(PlayerId(sender), data))
+            return;
+
         // The sender's shadow list = the shared inventory as it saw it + its change.
         WithSyncPaused(hostClient, () => CopyInto(master, data.Inventory));
         Dirty = true;
     }
 
-    /// <summary>Host: a player is joining; give them the shared inventory instead of their own.</summary>
+    /// <summary>Host: a player is joining; add their items to the master and send them the master.</summary>
     internal static void OnInitialSyncRequest(PlayerRef player)
     {
         if (!Resolve() || player == Runner.LocalPlayer)
@@ -116,7 +126,35 @@ internal static class SharedInventory
         if (data == null || master == null)
             return;
 
+        MergeIfNew(PlayerId(player), data);
         data.Inventory = Clone(master);
+    }
+
+    /// <summary>
+    /// Host, every frame (throttled by the driver): merge saved inventories not merged yet and
+    /// notice the host's own inventory changes (the game raises no event for those on the host).
+    /// </summary>
+    internal static void Poll()
+    {
+        if (!Resolve())
+            return;
+
+        var master = Master;
+        if (master == null)
+            return;
+
+        var hostId = PlayerId(Runner.LocalPlayer);
+        if (hostId == null)
+            return;
+
+        foreach (var entry in store.sessionPlayersData)
+        {
+            if (entry.Key != hostId)
+                MergeIfNew(entry.Key, entry.Value);
+        }
+
+        if (Signature(master) != lastSignature)
+            Dirty = true;
     }
 
     /// <summary>Host: push the master to every remote player.</summary>
@@ -128,6 +166,14 @@ internal static class SharedInventory
         var master = Master;
         if (master == null)
             return;
+
+        // Every saved inventory (also players who are offline) mirrors the master,
+        // so nobody brings back items that were used while they were away.
+        foreach (var entry in store.sessionPlayersData)
+        {
+            if (entry.Value != null)
+                entry.Value.Inventory = Clone(master);
+        }
 
         var runner = Runner;
         foreach (var entry in store.playersIdLookup)
@@ -143,6 +189,101 @@ internal static class SharedInventory
 
             if (player != runner.LocalPlayer)
                 server.HandleInitialSync(player, ref data);
+        }
+
+        // The host never sends its own dirty flags anywhere, so clear them here:
+        // the next change sets them again and shows up in the signature.
+        for (var i = 0; i < master.Count; i++)
+        {
+            var stack = master[i];
+            if (stack == null)
+                continue;
+            stack.IsDirty = false;
+            var items = stack.Items;
+            if (items == null)
+                continue;
+            for (var j = 0; j < items.Count; j++)
+            {
+                if (items[j] != null)
+                    items[j].IsDirty = false;
+            }
+        }
+
+        lastSignature = Signature(master);
+    }
+
+    /// <summary>Add the stacks of a player's own (saved) inventory that the master does not have yet.</summary>
+    private static bool MergeIfNew(string playerId, SessionPlayerData data)
+    {
+        if (playerId == null || data == null || merged.Contains(playerId))
+            return false;
+
+        merged.Add(playerId);
+        var source = data.Inventory;
+        var master = Master;
+        if (source == null || master == null || source.Count == 0)
+            return true;
+
+        var added = 0;
+        WithSyncPaused(hostClient, () =>
+        {
+            for (var i = 0; i < source.Count; i++)
+            {
+                var stack = source[i];
+                if (stack == null || Contains(master, stack))
+                    continue;
+                master.Add(Copy(stack));
+                added++;
+            }
+        });
+
+        Plugin.Logger.LogInfo($"Merged {added} stack(s) from player {playerId} into the shared inventory.");
+        Dirty = true;
+        return true;
+    }
+
+    private static bool Contains(ObservableList<ItemStack> list, ItemStack stack)
+    {
+        for (var i = 0; i < list.Count; i++)
+        {
+            var other = list[i];
+            if (other != null && other.UID == stack.UID && other.ItemID == stack.ItemID)
+                return true;
+        }
+
+        return false;
+    }
+
+    private static string PlayerId(PlayerRef player)
+    {
+        return store.playersIdLookup.TryGetValue(player, out var id) ? id : null;
+    }
+
+    /// <summary>Cheap fingerprint of the list: stacks, their sizes and the items in them.</summary>
+    private static long Signature(ObservableList<ItemStack> list)
+    {
+        unchecked
+        {
+            long hash = list.Count;
+            for (var i = 0; i < list.Count; i++)
+            {
+                var stack = list[i];
+                if (stack == null)
+                    continue;
+                hash = hash * 31 + (long)stack.UID;
+                hash = hash * 31 + stack.ItemsCount;
+                var items = stack.Items;
+                if (items == null)
+                    continue;
+                for (var j = 0; j < items.Count; j++)
+                {
+                    var item = items[j];
+                    if (item != null)
+                        hash = hash * 31 + (long)item.UID + (item.IsDirty ? 1 : 0);
+                }
+            }
+
+            return hash;
         }
     }
 
@@ -211,5 +352,7 @@ internal static class SharedInventory
         server = null;
         hostClient = null;
         Dirty = false;
+        merged.Clear();
+        lastSignature = 0;
     }
 }
