@@ -1,4 +1,4 @@
-using BepInEx;
+﻿using BepInEx;
 using BepInEx.Logging;
 using BepInEx.Unity.IL2CPP;
 using HarmonyLib;
@@ -11,7 +11,7 @@ public class Plugin : BasePlugin
 {
     public const string Guid = "querencia.cms2027.sharedinventory";
     public const string Name = "Shared Inventory";
-    public const string Version = "0.2.0";
+    public const string Version = "1.1.0";
 
     internal static ManualLogSource Logger;
 

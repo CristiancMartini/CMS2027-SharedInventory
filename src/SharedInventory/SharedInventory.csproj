@@ -1,10 +1,10 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <TargetFramework>net6.0</TargetFramework>
     <AssemblyName>SharedInventory</AssemblyName>
     <!-- Must match Plugin.Version and the release tag: the updater compares it. -->
-    <Version>0.2.0</Version>
+    <Version>1.1.0</Version>
     <RootNamespace>SharedInventory</RootNamespace>
     <LangVersion>latest</LangVersion>
     <Nullable>disable</Nullable>
