@@ -25,6 +25,11 @@ Write-Host "Building plugin..."
 if ($LASTEXITCODE -ne 0) { throw "Plugin build failed" }
 Copy-Item "$root\build\plugin\SharedInventory.dll" "$payload\SharedInventory.dll" -Force
 
+Write-Host "Building updater..."
+& $Dotnet build "$root\src\Updater\Updater.csproj" -c Release -p:GameDir="$GameDir" -o "$root\build\updater"
+if ($LASTEXITCODE -ne 0) { throw "Updater build failed" }
+Copy-Item "$root\build\updater\SharedInventory.Updater.dll" "$payload\SharedInventory.Updater.dll" -Force
+
 Write-Host "Building installer..."
 & $Dotnet build "$root\src\Installer\Installer.csproj" -c Release -o "$root\build\installer"
 if ($LASTEXITCODE -ne 0) { throw "Installer build failed" }

@@ -9,7 +9,7 @@
     <RootNamespace>Installer</RootNamespace>
     <ApplicationManifest>app.manifest</ApplicationManifest>
     <AppendTargetFrameworkToOutputPath>false</AppendTargetFrameworkToOutputPath>
-    <Version>0.1.0</Version>
+    <Version>0.2.0</Version>
   </PropertyGroup>
 
   <ItemGroup>
@@ -22,6 +22,7 @@
   <ItemGroup>
     <EmbeddedResource Include="..\..\payload\BepInEx.zip" LogicalName="BepInEx.zip" />
     <EmbeddedResource Include="..\..\payload\SharedInventory.dll" LogicalName="SharedInventory.dll" />
+    <EmbeddedResource Include="..\..\payload\SharedInventory.Updater.dll" LogicalName="SharedInventory.Updater.dll" />
   </ItemGroup>
 
 </Project>

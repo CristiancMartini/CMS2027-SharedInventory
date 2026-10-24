@@ -43,6 +43,21 @@ internal static class Patches
 
     // Host's own inventory changes (the game reports them through these list callbacks).
 
+    // Prefix: never let a write made by the mod (or a re-sync in progress) be sent to the host.
+    // Postfix: on the host, any other change means the shared inventory must be re-sent.
+
+    [HarmonyPrefix]
+    [HarmonyPatch(typeof(PlayerInventorySyncClient), nameof(PlayerInventorySyncClient.OnItemAdded))]
+    private static bool BeforeItemAdded() => !IsSilenced();
+
+    [HarmonyPrefix]
+    [HarmonyPatch(typeof(PlayerInventorySyncClient), nameof(PlayerInventorySyncClient.OnItemRemoved))]
+    private static bool BeforeItemRemoved() => !IsSilenced();
+
+    [HarmonyPrefix]
+    [HarmonyPatch(typeof(PlayerInventorySyncClient), nameof(PlayerInventorySyncClient.OnItemChanged))]
+    private static bool BeforeItemChanged() => !IsSilenced();
+
     [HarmonyPostfix]
     [HarmonyPatch(typeof(PlayerInventorySyncClient), nameof(PlayerInventorySyncClient.OnItemAdded))]
     private static void AfterItemAdded(PlayerInventorySyncClient __instance) => MarkHostDirty(__instance);
@@ -55,26 +70,32 @@ internal static class Patches
     [HarmonyPatch(typeof(PlayerInventorySyncClient), nameof(PlayerInventorySyncClient.OnItemChanged))]
     private static void AfterItemChanged(PlayerInventorySyncClient __instance) => MarkHostDirty(__instance);
 
+    private static bool IsSilenced() => SharedInventory.Applying || resyncClient != null;
+
     /// <summary>Changes inside a stack (condition, item count) only show up as dirty flags.</summary>
     [HarmonyPrefix]
     [HarmonyPatch(typeof(PlayerInventorySyncClient), nameof(PlayerInventorySyncClient.SendItemsChanges))]
-    private static void BeforeSendItemsChanges(PlayerInventorySyncClient __instance)
+    private static bool BeforeSendItemsChanges(PlayerInventorySyncClient __instance)
     {
-        if (SharedInventory.Applying || !SharedInventory.IsLocalHostClient(__instance))
-            return;
+        if (IsSilenced())
+            return false;
+        if (!SharedInventory.IsLocalHostClient(__instance))
+            return true;
 
         var items = __instance.localItemsCollection?.Items;
         if (items == null)
-            return;
+            return true;
 
         for (var i = 0; i < items.Count; i++)
         {
             if (items[i].CheckIsDirty())
             {
                 SharedInventory.Dirty = true;
-                return;
+                break;
             }
         }
+
+        return true;
     }
 
     private static void MarkHostDirty(PlayerInventorySyncClient client)
@@ -93,11 +114,15 @@ internal static class Patches
     private static PlayerInventorySyncClient resyncClient;
     private static ObservableList<ItemStack> resyncOriginalList;
 
+    /// <summary>
+    /// HandleFullSyncStartPacket is inlined into HandlePacket in the game build,
+    /// so the start of a full sync has to be caught here.
+    /// </summary>
     [HarmonyPrefix]
-    [HarmonyPatch(typeof(PlayerInventorySyncClient), nameof(PlayerInventorySyncClient.HandleFullSyncStartPacket))]
-    private static void BeforeFullSyncStart(PlayerInventorySyncClient __instance)
+    [HarmonyPatch(typeof(PlayerInventorySyncClient), nameof(PlayerInventorySyncClient.HandlePacket))]
+    private static void BeforeClientPacket(PlayerInventorySyncClient __instance, PacketType packetType)
     {
-        if (!__instance.initialSyncDone || SharedInventory.IsHost)
+        if (packetType != PacketType.InventoryFullSyncStart || !__instance.initialSyncDone || SharedInventory.IsHost)
             return;
 
         var collection = __instance.localItemsCollection;

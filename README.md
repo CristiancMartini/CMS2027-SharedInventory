@@ -14,6 +14,8 @@ Mod para **Car Mechanic Simulator 2027 (Multiplayer Demo)** que faz todos os jog
 
 Para remover: abra o instalador e clique em **Desinstalar**.
 
+**Atualização automática:** toda vez que o jogo abre, o mod confere a última release deste repositório e se atualiza sozinho (leva no máximo alguns segundos; sem internet, continua com a versão instalada).
+
 > O Windows SmartScreen pode avisar que o app não é reconhecido (o exe não é assinado). Clique em "Mais informações" → "Executar assim mesmo".
 
 ## Como funciona
@@ -47,6 +49,7 @@ Saída em `dist/`: o instalador (com BepInEx e o mod embutidos) e `SharedInvento
 Estrutura:
 
 - `src/SharedInventory` – plugin BepInEx (Harmony).
+- `src/Updater` – patcher BepInEx que roda antes dos plugins e baixa a `SharedInventory.dll` mais nova das releases. Para publicar uma versão: suba `<Version>` em `SharedInventory.csproj` e `Plugin.Version`, e crie a release `vX.Y.Z` com o asset `SharedInventory.dll`.
 - `src/Installer` – instalador WinForms (.NET Framework 4.8, já vem no Windows).
 
 ## Créditos

@@ -33,6 +33,8 @@ internal sealed class MainForm : Form
 
     private const string PluginFolder = @"BepInEx\plugins\SharedInventory";
     private const string PluginFile = "SharedInventory.dll";
+    private const string UpdaterFolder = @"BepInEx\patchers\SharedInventory";
+    private const string UpdaterFile = "SharedInventory.Updater.dll";
 
     private static readonly string[] BepInExRootFiles = { "winhttp.dll", "doorstop_config.ini", ".doorstop_version", "changelog.txt" };
 
@@ -159,11 +161,8 @@ internal sealed class MainForm : Form
             File.WriteAllText(config, "[Logging.Console]\r\nEnabled = false\r\n");
         }
 
-        var pluginDir = Path.Combine(gameDir, PluginFolder);
-        Directory.CreateDirectory(pluginDir);
-        using (var dll = Resource(PluginFile))
-        using (var file = File.Create(Path.Combine(pluginDir, PluginFile)))
-            dll.CopyTo(file);
+        WriteResource(PluginFile, Path.Combine(gameDir, PluginFolder));
+        WriteResource(UpdaterFile, Path.Combine(gameDir, UpdaterFolder));
 
         SetStatus("Instalado! Na primeira vez o jogo demora alguns minutos pra abrir. É normal.");
         MessageBox.Show(this,
@@ -175,9 +174,12 @@ internal sealed class MainForm : Form
 
     private void Uninstall(string gameDir)
     {
-        var pluginDir = Path.Combine(gameDir, PluginFolder);
-        if (Directory.Exists(pluginDir))
-            Directory.Delete(pluginDir, true);
+        foreach (var folder in new[] { PluginFolder, UpdaterFolder })
+        {
+            var dir = Path.Combine(gameDir, folder);
+            if (Directory.Exists(dir))
+                Directory.Delete(dir, true);
+        }
 
         var removeLoader = MessageBox.Show(this,
             "Mod removido.\n\nRemover também o BepInEx (o carregador de mods)? Se você usa outros mods, clique em Não.",
@@ -198,6 +200,14 @@ internal sealed class MainForm : Form
         }
 
         SetStatus("Desinstalado.");
+    }
+
+    private static void WriteResource(string name, string dir)
+    {
+        Directory.CreateDirectory(dir);
+        using var resource = Resource(name);
+        using var file = File.Create(Path.Combine(dir, name));
+        resource.CopyTo(file);
     }
 
     private static Stream Resource(string name)
